@@ -13,22 +13,17 @@
         <p class="eyebrow">Tender Summary Agent</p>
         <h1>Upload a tender document to generate a professional summary.</h1>
         <p class="subtext">Create a clean on-screen report and downloadable PDF and Word files from a single upload.</p>
-        <div class="hero-badges">
-          <span>Blue + pink UI</span>
-          <span>PDF and DOCX export</span>
-          <span>Structured tender summary</span>
-        </div>
       </div>
 
       <form class="upload-card" method="post" enctype="multipart/form-data">
         <div class="upload-card-header">
           <h2>Tender Summary Agent</h2>
-          <p>Upload your tender file and generate the report in one click.</p>
+          <p>Upload the tender and the agent will extract data, build the summary, and prepare PDF and Word outputs automatically.</p>
         </div>
 
         <label class="file-picker" for="tender_file">
           <span class="file-label">Tender file</span>
-          <span class="file-help">Supported: PDF, DOCX, TXT</span>
+          <span class="file-help">Supported: PDF, DOCX, TXT | Large tenders up to 700 pages</span>
           <input id="tender_file" name="tender_file" type="file" accept=".pdf,.docx,.txt" required>
           <span class="custom-file-box">
             <span class="custom-file-button">Choose File</span>
@@ -36,12 +31,15 @@
           </span>
         </label>
 
-        <button class="primary-btn" type="submit">Generate Summary</button>
+        <button class="primary-btn" id="submit-btn" type="submit">Generate Summary</button>
+        <p class="auto-note">After file selection, the agent starts processing automatically.</p>
+        <div class="processing-box" id="processing-box" hidden>
+          <span class="processing-dot"></span>
+          <span>Agent is extracting tender details and generating PDF and Word files...</span>
+        </div>
 
         {% if error %}
           <p class="status-msg error">{{ error }}</p>
-        {% else %}
-          <p class="status-msg neutral">The app reads the full file, builds the summary, and creates downloadable outputs.</p>
         {% endif %}
       </form>
     </section>
@@ -72,7 +70,7 @@
           {% endif %}
           <div class="grid">
             {% for key in keys %}
-              <article class="field-card {% if key == 'Scope of Work' %}wide{% endif %}">
+              <article class="field-card {% if key == 'Scope of Work (in paragraph form - detailed and complete)' %}wide{% endif %}">
                 <p class="field-key">{{ key }}</p>
                 <p class="field-value">{{ summary[key] }}</p>
               </article>
@@ -84,10 +82,10 @@
           <div class="group-title">IMPORTANT BIDDER ACTION POINTS</div>
           <div class="action-list">
             {% for label, value in action_points %}
-              <article class="field-card wide">
-                <p class="field-key">{{ label }}</p>
+              <div class="action-item">
+                <p class="action-line">&bull; {{ label }}</p>
                 <p class="field-value">{{ value }}</p>
-              </article>
+              </div>
             {% endfor %}
           </div>
         {% endif %}
@@ -95,12 +93,29 @@
     {% endif %}
   </main>
   <script>
+    const form = document.querySelector(".upload-card");
     const input = document.getElementById("tender_file");
     const fileName = document.getElementById("file-name");
+    const submitBtn = document.getElementById("submit-btn");
+    const processingBox = document.getElementById("processing-box");
 
-    if (input && fileName) {
+    if (input && fileName && form) {
       input.addEventListener("change", () => {
         fileName.textContent = input.files.length ? input.files[0].name : "No file selected";
+        if (!input.files.length) {
+          return;
+        }
+
+        if (processingBox) {
+          processingBox.hidden = false;
+        }
+
+        if (submitBtn) {
+          submitBtn.textContent = "Generating...";
+          submitBtn.disabled = true;
+        }
+
+        setTimeout(() => form.submit(), 150);
       });
     }
   </script>

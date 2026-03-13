@@ -31,7 +31,8 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = str(UPLOAD_DIR)
 app.config["OUTPUT_FOLDER"] = str(OUTPUT_DIR)
-app.config["MAX_CONTENT_LENGTH"] = 25 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 150 * 1024 * 1024
+app.config["PDF_PAGE_SOFT_LIMIT"] = 700
 
 
 REPORT_ORDER = [
@@ -48,11 +49,11 @@ REPORT_ORDER = [
     "Financial Bid Opening Date",
     "Estimated Cost",
     "Completion Period",
-    "Scope of Work",
+    "Scope of Work (in paragraph form - detailed and complete)",
     "EMD Amount",
     "Tender Fee",
     "Security Deposit / PBG",
-    "Price Basis",
+    "Price Basis (GST inclusion / exclusion)",
     "Payment Terms",
     "A. Bidder Type / OEM / Consortium / JV",
     "B. Turnover Requirement",
@@ -74,8 +75,8 @@ REPORT_ORDER = [
 REPORT_SECTIONS = [
     ("", ["End User", "Tender Title", "NIT / Tender No", "Tender Type", "Tender Mode / Portal", "Location / Site"]),
     ("KEY DATES", ["Site Visit", "Pre-Bid Meeting", "Last Date of Bid Submission", "Technical Bid Opening Date", "Financial Bid Opening Date"]),
-    ("PROJECT DETAILS", ["Estimated Cost", "Completion Period", "Scope of Work"]),
-    ("FINANCIAL DETAILS", ["EMD Amount", "Tender Fee", "Security Deposit / PBG", "Price Basis", "Payment Terms"]),
+    ("PROJECT DETAILS", ["Estimated Cost", "Completion Period", "Scope of Work (in paragraph form - detailed and complete)"]),
+    ("FINANCIAL DETAILS", ["EMD Amount", "Tender Fee", "Security Deposit / PBG", "Price Basis (GST inclusion / exclusion)", "Payment Terms"]),
     (
         "ELIGIBILITY CRITERIA",
         [
@@ -100,22 +101,28 @@ class ReportFiles:
     docx_name: str
 
 
+@dataclass
+class ExtractedDocument:
+    text: str
+    page_count: int | None = None
+
+
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def extract_text(file_path: Path) -> str:
+def extract_text(file_path: Path) -> ExtractedDocument:
     suffix = file_path.suffix.lower()
     if suffix == ".pdf":
         pages: List[str] = []
         with pdfplumber.open(str(file_path)) as pdf:
             for page in pdf.pages:
                 pages.append(page.extract_text() or "")
-        return "\n".join(pages)
+            return ExtractedDocument(text="\n".join(pages), page_count=len(pdf.pages))
     if suffix == ".docx":
         doc = Document(str(file_path))
-        return "\n".join(p.text for p in doc.paragraphs)
-    return file_path.read_text(encoding="utf-8", errors="ignore")
+        return ExtractedDocument(text="\n".join(p.text for p in doc.paragraphs))
+    return ExtractedDocument(text=file_path.read_text(encoding="utf-8", errors="ignore"))
 
 
 def normalize_text(text: str) -> str:
@@ -123,6 +130,11 @@ def normalize_text(text: str) -> str:
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{2,}", "\n\n", text)
     return text.strip()
+
+
+def has_meaningful_text(text: str) -> bool:
+    compact = re.sub(r"\s+", "", text)
+    return len(compact) >= 40
 
 
 def find_labeled_value(text: str, labels: List[str], default: str = "Not specified in document") -> str:
@@ -232,7 +244,7 @@ def extract_report(text: str, filename: str) -> Dict[str, str]:
             text,
             ["Completion Period", "Period of Completion", "Time for Completion", "Delivery Period"],
         ),
-        "Scope of Work": section_paragraph(
+        "Scope of Work (in paragraph form - detailed and complete)": section_paragraph(
             text,
             ["Scope of Work", "Detailed Scope of Work", "Brief Scope", "Project Scope", "Scope"],
             [
@@ -252,7 +264,7 @@ def extract_report(text: str, filename: str) -> Dict[str, str]:
                 r"(?is)\b(?:Security Deposit|Performance Security|PBG|Performance Bank Guarantee)\b\s*[:\-]?\s*(.{0,180})",
             ],
         ),
-        "Price Basis": find_first_match(
+        "Price Basis (GST inclusion / exclusion)": find_first_match(
             text,
             [
                 r"(?is)\b(?:Price Basis|Price bid|Rates?)\b\s*[:\-]?\s*(.{0,180})",
@@ -384,7 +396,7 @@ def build_action_points(report: Dict[str, str]) -> List[Tuple[str, str]]:
         ("OEM authorization", present("A. Bidder Type / OEM / Consortium / JV", "Not specified in document")),
         ("Compliance sheets", present("Compliance Requirements", "Not specified in document")),
         ("Technical documents required", present("Technical Documents to be submitted", "Not specified in document")),
-        ("Commercial quote format", present("Price Basis", "Not specified in document")),
+        ("Commercial quote format", present("Price Basis (GST inclusion / exclusion)", "Not specified in document")),
         ("Any affidavit / undertaking", present("H. Specific Mandatory Conditions", "Not specified in document")),
         ("Portal submission requirement", present("Tender Mode / Portal", "Not specified in document")),
         (
@@ -465,17 +477,23 @@ def index():
             upload_path = UPLOAD_DIR / stored_name
             uploaded.save(upload_path)
 
-            text = extract_text(upload_path)
-            report = extract_report(text, safe_name)
-            action_points = build_action_points(report)
+            extracted = extract_text(upload_path)
+            text = extracted.text
+            if extracted.page_count and extracted.page_count > app.config["PDF_PAGE_SOFT_LIMIT"]:
+                error = f"The uploaded PDF has {extracted.page_count} pages. Please use a tender file up to 700 pages."
+            elif not has_meaningful_text(text):
+                error = "The file was uploaded, but readable tender text could not be extracted from it."
+            else:
+                report = extract_report(text, safe_name)
+                action_points = build_action_points(report)
 
-            pdf_name = f"{upload_path.stem}_summary.pdf"
-            docx_name = f"{upload_path.stem}_summary.docx"
-            create_pdf(report, action_points, OUTPUT_DIR / pdf_name)
-            create_docx(report, action_points, OUTPUT_DIR / docx_name)
+                pdf_name = f"{upload_path.stem}_summary.pdf"
+                docx_name = f"{upload_path.stem}_summary.docx"
+                create_pdf(report, action_points, OUTPUT_DIR / pdf_name)
+                create_docx(report, action_points, OUTPUT_DIR / docx_name)
 
-            summary = report
-            downloads = ReportFiles(pdf_name=pdf_name, docx_name=docx_name)
+                summary = report
+                downloads = ReportFiles(pdf_name=pdf_name, docx_name=docx_name)
             
     return render_template(
         "index.html",
