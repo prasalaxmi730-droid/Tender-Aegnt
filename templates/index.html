@@ -11,8 +11,8 @@
     <section class="hero-shell">
       <div class="brand-panel">
         <p class="eyebrow">Tender Summary Agent</p>
-        <h1>Upload a tender document to generate a professional summary.</h1>
-        <p class="subtext">Create a clean on-screen report and downloadable PDF and Word files from a single upload.</p>
+        <h1>Upload tender file to generate a professional summary.</h1>
+        <p class="subtext">Built for production-style tender processing with structured extraction, eligibility capture, commercial clarity, and clean downloadable output.</p>
       </div>
 
       <form class="upload-card" method="post" enctype="multipart/form-data">
@@ -23,7 +23,7 @@
 
         <label class="file-picker" for="tender_file">
           <span class="file-label">Tender file</span>
-          <span class="file-help">Supported: PDF, DOCX, TXT | Large tenders up to 700 pages</span>
+          <span class="file-help">Supported: PDF, DOCX, TXT | Large tender support up to 700 pages</span>
           <input id="tender_file" name="tender_file" type="file" accept=".pdf,.docx,.txt" required>
           <span class="custom-file-box">
             <span class="custom-file-button">Choose File</span>
@@ -31,28 +31,49 @@
           </span>
         </label>
 
-        <button class="primary-btn" id="submit-btn" type="submit">Generate Summary</button>
-        <p class="auto-note">After file selection, the agent starts processing automatically.</p>
-        <div class="processing-box" id="processing-box" hidden>
-          <span class="processing-dot"></span>
-          <span>Agent is extracting tender details and generating PDF and Word files...</span>
+        <div class="status-card">
+          <span class="status-dot"></span>
+          <div>
+            <p class="status-title">Agent status</p>
+            <p class="status-copy">Waiting for tender document. The UI is ready for extraction, summary generation, and downloadable output.</p>
+          </div>
         </div>
+
+        <button class="primary-btn" id="submit-btn" type="submit">Generate Summary</button>
 
         {% if error %}
           <p class="status-msg error">{{ error }}</p>
         {% endif %}
+
+        <section class="steps-panel">
+          <article class="step-card">
+            <p class="step-tag">STEP 1</p>
+            <h3>Upload tender file</h3>
+          </article>
+          <article class="step-card">
+            <p class="step-tag">STEP 2</p>
+            <h3>Extract criteria and tender terms</h3>
+          </article>
+          <article class="step-card">
+            <p class="step-tag">STEP 3</p>
+            <h3>Professional summary and export</h3>
+          </article>
+        </section>
       </form>
     </section>
 
     {% if downloads %}
-      <section class="downloads">
-        <div>
-          <p class="section-tag">Output Files</p>
-          <h2>Download the generated report</h2>
-        </div>
-        <div class="download-actions">
-          <a class="download-btn" href="{{ url_for('download', filename=downloads.pdf_name) }}">Download PDF</a>
-          <a class="download-btn secondary" href="{{ url_for('download', filename=downloads.docx_name) }}">Download Word</a>
+      <section class="downloads-wrap">
+        <div class="downloads-card">
+          <div class="downloads-copy">
+            <p class="section-tag">Output Files</p>
+            <h2>Download generated files</h2>
+            <p class="downloads-note">Your tender summary is ready in both PDF and Word format.</p>
+          </div>
+          <div class="download-actions">
+            <a class="download-btn" href="{{ url_for('download', filename=downloads.pdf_name) }}">Download PDF</a>
+            <a class="download-btn secondary" href="{{ url_for('download', filename=downloads.docx_name) }}">Download Word</a>
+          </div>
         </div>
       </section>
     {% endif %}
@@ -63,17 +84,12 @@
     const input = document.getElementById("tender_file");
     const fileName = document.getElementById("file-name");
     const submitBtn = document.getElementById("submit-btn");
-    const processingBox = document.getElementById("processing-box");
 
     if (input && fileName && form) {
       input.addEventListener("change", () => {
         fileName.textContent = input.files.length ? input.files[0].name : "No file selected";
         if (!input.files.length) {
           return;
-        }
-
-        if (processingBox) {
-          processingBox.hidden = false;
         }
 
         if (submitBtn) {
