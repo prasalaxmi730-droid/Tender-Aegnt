@@ -57,40 +57,6 @@
       </section>
     {% endif %}
 
-    {% if summary %}
-      <section class="summary">
-        <div class="summary-header">
-          <p class="section-tag">Generated Summary</p>
-          <h2>TENDER SUMMARY REPORT</h2>
-        </div>
-
-        {% for heading, keys in sections %}
-          {% if heading %}
-            <div class="group-title">{{ heading }}</div>
-          {% endif %}
-          <div class="grid">
-            {% for key in keys %}
-              <article class="field-card {% if key == 'Scope of Work (in paragraph form - detailed and complete)' %}wide{% endif %}">
-                <p class="field-key">{{ key }}</p>
-                <p class="field-value">{{ summary[key] }}</p>
-              </article>
-            {% endfor %}
-          </div>
-        {% endfor %}
-
-        {% if action_points %}
-          <div class="group-title">IMPORTANT BIDDER ACTION POINTS</div>
-          <div class="action-list">
-            {% for label, value in action_points %}
-              <div class="action-item">
-                <p class="action-line">&bull; {{ label }}</p>
-                <p class="field-value">{{ value }}</p>
-              </div>
-            {% endfor %}
-          </div>
-        {% endif %}
-      </section>
-    {% endif %}
   </main>
   <script>
     const form = document.querySelector(".upload-card");

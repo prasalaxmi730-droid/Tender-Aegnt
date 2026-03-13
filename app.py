@@ -408,31 +408,105 @@ def build_action_points(report: Dict[str, str]) -> List[Tuple[str, str]]:
     ]
 
 
+def build_report_blocks(report: Dict[str, str], action_points: List[Tuple[str, str]]) -> List[Tuple[str, List[Tuple[str, str]]]]:
+    return [
+        (
+            "",
+            [
+                ("End User", report["End User"]),
+                ("Tender Title", report["Tender Title"]),
+                ("NIT / Tender No", report["NIT / Tender No"]),
+                ("Tender Type", report["Tender Type"]),
+                ("Tender Mode / Portal", report["Tender Mode / Portal"]),
+                ("Location / Site", report["Location / Site"]),
+            ],
+        ),
+        (
+            "KEY DATES",
+            [
+                ("Site Visit", report["Site Visit"]),
+                ("Pre-Bid Meeting", report["Pre-Bid Meeting"]),
+                ("Last Date of Bid Submission", report["Last Date of Bid Submission"]),
+                ("Technical Bid Opening Date", report["Technical Bid Opening Date"]),
+                ("Financial Bid Opening Date", report["Financial Bid Opening Date"]),
+            ],
+        ),
+        (
+            "PROJECT DETAILS",
+            [
+                ("Estimated Cost", report["Estimated Cost"]),
+                ("Completion Period", report["Completion Period"]),
+                ("Scope of Work (Detailed Paragraph)", report["Scope of Work (in paragraph form - detailed and complete)"]),
+            ],
+        ),
+        (
+            "FINANCIAL DETAILS",
+            [
+                ("EMD Amount", report["EMD Amount"]),
+                ("Tender Fee", report["Tender Fee"]),
+                ("Security Deposit / PBG", report["Security Deposit / PBG"]),
+                ("Price Basis (GST inclusion / exclusion)", report["Price Basis (GST inclusion / exclusion)"]),
+                ("Payment Terms", report["Payment Terms"]),
+            ],
+        ),
+        (
+            "ELIGIBILITY CRITERIA",
+            [
+                ("A. Bidder Type / OEM / Consortium / JV", report["A. Bidder Type / OEM / Consortium / JV"]),
+                ("B. Turnover Requirement", report["B. Turnover Requirement"]),
+                ("C. Work Experience", report["C. Work Experience"]),
+                ("D. Technical Experience", report["D. Technical Experience"]),
+                ("E. Manpower / Certification Requirement", report["E. Manpower / Certification Requirement"]),
+                ("F. Financial Strength / Net Worth", report["F. Financial Strength / Net Worth"]),
+                ("G. Statutory Requirements", report["G. Statutory Requirements"]),
+                ("H. Specific Mandatory Conditions", report["H. Specific Mandatory Conditions"]),
+            ],
+        ),
+        (
+            "TECHNICAL REQUIREMENTS",
+            [
+                ("Approved Makes / Brands", report["Approved Makes / Brands"]),
+                ("Compliance Requirements", report["Compliance Requirements"]),
+                ("Technical Documents to be submitted", report["Technical Documents to be submitted"]),
+            ],
+        ),
+        (
+            "COMMERCIAL TERMS",
+            [
+                ("Tender Validity", report["Tender Validity"]),
+                ("Warranty / CAMC / O&M", report["Warranty / CAMC / O&M"]),
+                ("LD / Penalties", report["LD / Penalties"]),
+                ("Rejection Conditions", report["Rejection Conditions"]),
+            ],
+        ),
+        ("IMPORTANT BIDDER ACTION POINTS", action_points),
+    ]
+
+
 def create_docx(report: Dict[str, str], action_points: List[Tuple[str, str]], output_path: Path) -> None:
     doc = Document()
     title = doc.add_paragraph()
     run = title.add_run("TENDER SUMMARY REPORT")
     run.bold = True
     run.font.size = Pt(16)
-
-    for heading, keys in REPORT_SECTIONS:
+    for heading, items in build_report_blocks(report, action_points):
         if heading:
             p = doc.add_paragraph()
             r = p.add_run(heading)
             r.bold = True
-        for key in keys:
-            para = doc.add_paragraph()
-            label = para.add_run(f"{key}: ")
-            label.bold = True
-            para.add_run(report[key])
-
-    p = doc.add_paragraph()
-    r = p.add_run("IMPORTANT BIDDER ACTION POINTS")
-    r.bold = True
-    for label, value in action_points:
-        para = doc.add_paragraph(style="List Bullet")
-        para.add_run(f"{label}: ").bold = True
-        para.add_run(value)
+        for label, value in items:
+            if heading == "IMPORTANT BIDDER ACTION POINTS":
+                para = doc.add_paragraph(style="List Bullet")
+                para.add_run(label)
+                if value and value != "Not specified in document":
+                    para.add_run(f" - {value}")
+            else:
+                label_para = doc.add_paragraph()
+                label_run = label_para.add_run(f"{label}:")
+                label_run.bold = True
+                value_para = doc.add_paragraph(value)
+        if heading:
+            doc.add_paragraph()
 
     doc.save(str(output_path))
 
@@ -442,17 +516,22 @@ def create_pdf(report: Dict[str, str], action_points: List[Tuple[str, str]], out
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name="SectionHeading", parent=styles["Heading2"], spaceAfter=8, spaceBefore=10))
     styles.add(ParagraphStyle(name="Field", parent=styles["BodyText"], leading=14, spaceAfter=5))
+    styles.add(ParagraphStyle(name="Label", parent=styles["BodyText"], leading=14, spaceAfter=3, spaceBefore=6))
     story = [Paragraph("TENDER SUMMARY REPORT", styles["Title"]), Spacer(1, 8)]
-
-    for heading, keys in REPORT_SECTIONS:
+    for heading, items in build_report_blocks(report, action_points):
         if heading:
             story.append(Paragraph(heading, styles["SectionHeading"]))
-        for key in keys:
-            story.append(Paragraph(f"<b>{key}:</b> {report[key]}", styles["Field"]))
-
-    story.append(Paragraph("IMPORTANT BIDDER ACTION POINTS", styles["SectionHeading"]))
-    for label, value in action_points:
-        story.append(Paragraph(f"&bull; <b>{label}:</b> {value}", styles["Field"]))
+        for label, value in items:
+            if heading == "IMPORTANT BIDDER ACTION POINTS":
+                if value and value != "Not specified in document":
+                    story.append(Paragraph(f"&bull; {label} - {value}", styles["Field"]))
+                else:
+                    story.append(Paragraph(f"&bull; {label}", styles["Field"]))
+            else:
+                story.append(Paragraph(f"<b>{label}:</b>", styles["Label"]))
+                story.append(Paragraph(value, styles["Field"]))
+        if heading:
+            story.append(Spacer(1, 6))
 
     doc.build(story)
 
