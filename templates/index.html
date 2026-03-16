@@ -56,24 +56,24 @@
             <h3>Professional summary and export</h3>
           </article>
         </section>
+
+        {% if downloads %}
+          <section class="downloads-wrap">
+            <div class="downloads-card">
+              <div class="downloads-copy">
+                <p class="section-tag">Output Files</p>
+                <h2>Download Files</h2>
+                <p class="downloads-note">Your tender summary is ready in both PDF and Word format.</p>
+              </div>
+              <div class="download-actions">
+                <a class="download-btn" href="{{ url_for('download', filename=downloads.pdf_name) }}">Download PDF</a>
+                <a class="download-btn secondary" href="{{ url_for('download', filename=downloads.docx_name) }}">Download Word</a>
+              </div>
+            </div>
+          </section>
+        {% endif %}
       </form>
     </section>
-
-    {% if downloads %}
-      <section class="downloads-wrap">
-        <div class="downloads-card">
-          <div class="downloads-copy">
-            <p class="section-tag">Output Files</p>
-            <h2>Download Files</h2>
-            <p class="downloads-note">Your tender summary is ready in both PDF and Word format.</p>
-          </div>
-          <div class="download-actions">
-            <a class="download-btn" href="{{ url_for('download', filename=downloads.pdf_name) }}">Download PDF</a>
-            <a class="download-btn secondary" href="{{ url_for('download', filename=downloads.docx_name) }}">Download Word</a>
-          </div>
-        </div>
-      </section>
-    {% endif %}
 
   </main>
   <script>
