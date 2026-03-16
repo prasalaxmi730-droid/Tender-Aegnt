@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 import pdfplumber
+import fitz
 from docx import Document
 from docx.shared import Pt
-from flask import Flask, render_template, request, send_from_directory, url_for
+from flask import Flask, Response, redirect, render_template, request, send_from_directory, session, url_for
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
@@ -33,6 +34,7 @@ app.config["UPLOAD_FOLDER"] = str(UPLOAD_DIR)
 app.config["OUTPUT_FOLDER"] = str(OUTPUT_DIR)
 app.config["MAX_CONTENT_LENGTH"] = 150 * 1024 * 1024
 app.config["PDF_PAGE_SOFT_LIMIT"] = 700
+app.secret_key = "tender-agent-local-secret"
 
 
 REPORT_ORDER = [
@@ -114,11 +116,16 @@ def allowed_file(filename: str) -> bool:
 def extract_text(file_path: Path) -> ExtractedDocument:
     suffix = file_path.suffix.lower()
     if suffix == ".pdf":
-        pages: List[str] = []
-        with pdfplumber.open(str(file_path)) as pdf:
-            for page in pdf.pages:
-                pages.append(page.extract_text() or "")
-            return ExtractedDocument(text="\n".join(pages), page_count=len(pdf.pages))
+        try:
+            with fitz.open(str(file_path)) as pdf:
+                pages = [page.get_text("text") or "" for page in pdf]
+                return ExtractedDocument(text="\n".join(pages), page_count=len(pdf))
+        except Exception:
+            pages = []
+            with pdfplumber.open(str(file_path)) as pdf:
+                for page in pdf.pages:
+                    pages.append(page.extract_text() or "")
+                return ExtractedDocument(text="\n".join(pages), page_count=len(pdf.pages))
     if suffix == ".docx":
         doc = Document(str(file_path))
         return ExtractedDocument(text="\n".join(p.text for p in doc.paragraphs))
@@ -542,13 +549,29 @@ def index():
     downloads = None
     error = None
     action_points = None
+    status_state = "idle"
+    status_message = "Waiting for tender document."
+
+    if request.method == "GET":
+        last_result = session.pop("last_result", None)
+        if last_result:
+            downloads = ReportFiles(
+                pdf_name=last_result["pdf_name"],
+                docx_name=last_result["docx_name"],
+            )
+            status_state = last_result["status_state"]
+            status_message = last_result["status_message"]
 
     if request.method == "POST":
         uploaded = request.files.get("tender_file")
         if not uploaded or uploaded.filename == "":
             error = "Please upload a tender file first."
+            status_state = "error"
+            status_message = "Please upload a tender file."
         elif not allowed_file(uploaded.filename):
             error = "Only PDF, DOCX, and TXT files are supported."
+            status_state = "error"
+            status_message = "Unsupported file type."
         else:
             safe_name = secure_filename(uploaded.filename)
             token = uuid.uuid4().hex[:10]
@@ -560,8 +583,12 @@ def index():
             text = extracted.text
             if extracted.page_count and extracted.page_count > app.config["PDF_PAGE_SOFT_LIMIT"]:
                 error = f"The uploaded PDF has {extracted.page_count} pages. Please use a tender file up to 700 pages."
+                status_state = "error"
+                status_message = "Tender file exceeds the 700 page limit."
             elif not has_meaningful_text(text):
                 error = "The file was uploaded, but readable tender text could not be extracted from it."
+                status_state = "error"
+                status_message = "Readable tender text could not be extracted."
             else:
                 report = extract_report(text, safe_name)
                 action_points = build_action_points(report)
@@ -573,6 +600,15 @@ def index():
 
                 summary = report
                 downloads = ReportFiles(pdf_name=pdf_name, docx_name=docx_name)
+                status_state = "success"
+                status_message = "Processing completed. Download files are ready."
+                session["last_result"] = {
+                    "pdf_name": pdf_name,
+                    "docx_name": docx_name,
+                    "status_state": status_state,
+                    "status_message": status_message,
+                }
+                return redirect(url_for("index"))
             
     return render_template(
         "index.html",
@@ -581,12 +617,19 @@ def index():
         error=error,
         sections=REPORT_SECTIONS,
         action_points=action_points if summary else None,
+        status_state=status_state,
+        status_message=status_message,
     )
 
 
 @app.route("/download/<path:filename>")
 def download(filename: str):
     return send_from_directory(app.config["OUTPUT_FOLDER"], filename, as_attachment=True)
+
+
+@app.route("/favicon.ico")
+def favicon() -> Response:
+    return Response(status=204)
 
 
 def open_browser() -> None:

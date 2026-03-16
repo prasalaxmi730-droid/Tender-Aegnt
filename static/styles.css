@@ -75,7 +75,7 @@ h2 {
 }
 
 h1 {
-  font-size: clamp(4.6rem, 8vw, 7.8rem);
+  font-size: clamp(3.6rem, 6.3vw, 5.9rem);
   max-width: 7.5ch;
   font-weight: 900;
   line-height: 0.9;
@@ -204,6 +204,18 @@ input[type="file"] {
   background: #e5e7ef;
 }
 
+.status-card-success {
+  background: #e4edf0;
+}
+
+.status-card-error {
+  background: #f4e7ea;
+}
+
+.status-card-processing {
+  background: #e7ebf6;
+}
+
 .status-dot {
   width: 12px;
   height: 12px;
@@ -212,6 +224,21 @@ input[type="file"] {
   background: var(--accent-soft);
   box-shadow: 0 0 0 6px rgba(235, 116, 175, 0.18);
   flex: 0 0 auto;
+}
+
+.status-card-success .status-dot {
+  background: #37b37e;
+  box-shadow: 0 0 0 6px rgba(55, 179, 126, 0.16);
+}
+
+.status-card-error .status-dot {
+  background: #d45a72;
+  box-shadow: 0 0 0 6px rgba(212, 90, 114, 0.14);
+}
+
+.status-card-processing .status-dot {
+  background: #5b7ee5;
+  box-shadow: 0 0 0 6px rgba(91, 126, 229, 0.14);
 }
 
 .status-title {
@@ -298,10 +325,10 @@ input[type="file"] {
 }
 
 .downloads-copy h2 {
-  font-size: clamp(2rem, 3vw, 3rem);
-  line-height: 0.98;
+  font-size: clamp(1.6rem, 2.3vw, 2.2rem);
+  line-height: 1.02;
   color: var(--accent);
-  max-width: 8ch;
+  max-width: none;
 }
 
 .downloads-note {
@@ -396,7 +423,7 @@ input[type="file"] {
   }
 
   h1 {
-    font-size: clamp(3.6rem, 16vw, 5.2rem);
+    font-size: clamp(3rem, 13vw, 4.5rem);
     max-width: 8ch;
   }
 
